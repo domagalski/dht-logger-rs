@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 use std::io::{prelude::*, Error, ErrorKind};
+use std::net::UdpSocket;
 use std::ptr;
 use std::time::Duration;
 
-use serde_json;
+use portpicker;
+use serde_json::Value;
 use serialport::{ClearBuffer, DataBits, FlowControl, Parity, SerialPort, StopBits};
 
 use super::*;
@@ -11,7 +13,7 @@ use super::*;
 // Validate that sensor data can be read
 #[test]
 fn test_read_sensor() {
-    let port = Box::new(MockSerialPort::new(false));
+    let port = Box::new(MockSerialPort::new(1));
     let sensor_config = HashMap::new();
     let logger_config = HashMap::new();
 
@@ -23,7 +25,7 @@ fn test_read_sensor() {
 // Validate that read errors are detected
 #[test]
 fn test_empty_sensor() {
-    let port = Box::new(MockSerialPort::new(true));
+    let port = Box::new(MockSerialPort::new(0));
     let sensor_config = HashMap::new();
     let logger_config = HashMap::new();
 
@@ -33,14 +35,52 @@ fn test_empty_sensor() {
 
 // Validate that data logged over UDP shows up
 #[test]
-#[ignore]
 fn test_udp_logger() {
-    let port = Box::new(MockSerialPort::new(false));
-    let sensor_config = HashMap::new();
-    let logger_config = HashMap::new();
+    // Create random UDP addr
+    let udp_port = portpicker::pick_unused_port().expect("no ports available");
+    let udp_addr = format!("127.0.0.1:{}", udp_port);
+    let udp_sock = UdpSocket::bind(udp_addr.clone())
+        .expect(&format!("failed to bind to udp address: {}", udp_addr));
+    udp_sock
+        .set_read_timeout(Some(Duration::from_secs(1)))
+        .expect("failed to set read timeout");
 
+    // Add random UDP addr to logger_config
+    let mut logger_config = HashMap::new();
+    logger_config.insert(
+        String::from("udp"),
+        Value::Array(vec![Value::String(udp_addr.clone())]),
+    );
+
+    // Create mock serial port
+    let data_size = 10;
+    let port = Box::new(MockSerialPort::new(data_size));
+    let sensor_config = HashMap::new();
+
+    // Send fake data over UDP
     let logger = DhtLogger::new(port, sensor_config, logger_config);
     logger.read_sensor_and_log_data(10);
+
+    // Deserialize data over UDP
+    let mut buffer: [u8; super::BUFFER_SIZE] = [0; super::BUFFER_SIZE];
+    let (n_bytes, _) = udp_sock
+        .recv_from(&mut buffer)
+        .expect("Failed to read data from socket");
+    let data = serde_json::from_slice::<DhtSensorsSerde>(&buffer[..n_bytes])
+        .expect("failed to deserialize");
+    let data = DhtSensors::from_serde(data);
+    assert!(data.is_ok());
+    let data = data.unwrap();
+    assert_eq!(data.data.len(), data_size);
+
+    // Validate that the data is equal to what it should be equal to.
+    for i in 0..data_size {
+        let value = 1.0 * (i as f32);
+        let data = data.data.get(&format!("{}", i)).unwrap();
+        assert_eq!(data.temperature, value);
+        assert_eq!(data.humidity, value);
+        assert_eq!(data.heat_index, value);
+    }
 }
 
 //////////////////
@@ -56,15 +96,16 @@ struct MockSerialPort {
 }
 
 impl MockSerialPort {
-    fn new(empty: bool) -> MockSerialPort {
+    fn new(length: usize) -> MockSerialPort {
         let mut data = RawSensors::new();
-        if !empty {
+        for i in 0..length {
+            let value = 1.0 * (i as f32);
             data.insert(
-                String::from("0"),
+                format!("{}", i),
                 DhtDataRaw {
-                    t: 0.0,
-                    h: 0.0,
-                    hi: 0.0,
+                    t: value,
+                    h: value,
+                    hi: value,
                 },
             );
         }

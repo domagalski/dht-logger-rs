@@ -1,8 +1,15 @@
 //! Serializable messages representing DHT sensor data.
 
+use std::collections::{HashMap, HashSet};
+use std::io::{Error, ErrorKind};
+
+use chrono::{DateTime, Utc};
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-/// Compact JSON from the DHT sensor over serial.
+use super::Result;
+
+/// Serde JSON from the DHT sensor over serial.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct DhtDataRaw {
     pub t: f32,
@@ -25,6 +32,109 @@ impl From<DhtDataRaw> for SensorData {
             temperature: data.t,
             humidity: data.h,
             heat_index: data.hi,
+        }
+    }
+}
+
+/// Container of measurements from all DHT sensors in one reading.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct DhtSensors {
+    pub timestamp: DateTime<Utc>,
+    pub data: HashMap<String, SensorData>,
+}
+
+impl DhtSensors {
+    /// Decode a `DntSensorsSerde` struct into DhtSensors.
+    ///
+    /// If not all hashmaps in DhtSensorsPacked have
+    pub fn from_serde(data: DhtSensorsSerde) -> Result<DhtSensors> {
+        let timestamp = data.timestamp;
+        let mut key_sets: HashSet<Vec<String>> = HashSet::new();
+        key_sets.insert(
+            data.t
+                .keys()
+                .cloned()
+                .collect::<Vec<String>>()
+                .iter()
+                .sorted()
+                .cloned()
+                .collect(),
+        );
+        key_sets.insert(
+            data.h
+                .keys()
+                .cloned()
+                .collect::<Vec<String>>()
+                .iter()
+                .sorted()
+                .cloned()
+                .collect(),
+        );
+        key_sets.insert(
+            data.hi
+                .keys()
+                .cloned()
+                .collect::<Vec<String>>()
+                .iter()
+                .sorted()
+                .cloned()
+                .collect(),
+        );
+
+        if key_sets.len() != 1 {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                "key mismatched in packed data",
+            ));
+        }
+
+        let keys = key_sets.iter().next().unwrap();
+        let mut sensor_data = HashMap::new();
+        for key in keys.iter() {
+            sensor_data.insert(
+                key.clone(),
+                SensorData {
+                    temperature: *data.t.get(key).unwrap(),
+                    humidity: *data.h.get(key).unwrap(),
+                    heat_index: *data.hi.get(key).unwrap(),
+                },
+            );
+        }
+
+        Ok(DhtSensors {
+            timestamp,
+            data: sensor_data,
+        })
+    }
+}
+
+/// A more compactly serialized verson of DhtSensors for serializing via JSON
+#[derive(Debug, Deserialize, Serialize)]
+pub struct DhtSensorsSerde {
+    pub timestamp: DateTime<Utc>,
+    pub t: HashMap<String, f32>,
+    pub h: HashMap<String, f32>,
+    pub hi: HashMap<String, f32>,
+}
+
+impl From<DhtSensors> for DhtSensorsSerde {
+    fn from(data: DhtSensors) -> DhtSensorsSerde {
+        let timestamp = data.timestamp;
+        let mut temperature = HashMap::new();
+        let mut humidity = HashMap::new();
+        let mut heat_index = HashMap::new();
+
+        for (key, value) in data.data.iter() {
+            temperature.insert(key.clone(), value.temperature);
+            humidity.insert(key.clone(), value.humidity);
+            heat_index.insert(key.clone(), value.heat_index);
+        }
+
+        DhtSensorsSerde {
+            timestamp,
+            t: temperature,
+            h: humidity,
+            hi: heat_index,
         }
     }
 }

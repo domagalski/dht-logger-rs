@@ -25,10 +25,12 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Error, ErrorKind};
+use std::net::{SocketAddrV4, UdpSocket};
 use std::path::Path;
 use std::thread;
 use std::time::Duration;
 
+use chrono::Utc;
 use log;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -44,8 +46,6 @@ pub mod tests;
 
 /// Contain results with `std::io::Error` as the `Error` implementation.
 pub type Result<T> = std::result::Result<T, Error>;
-/// Container of measurements from all DHT sensors in one reading.
-pub type DhtSensors = HashMap<String, SensorData>;
 
 const BUFFER_SIZE: usize = 1024;
 const TIMEOUT: Duration = Duration::from_secs(4);
@@ -88,6 +88,8 @@ pub struct DhtLogger {
     port: RefCell<Box<dyn SerialPort>>,
     sensor_config: HashMap<String, String>,
     verbose: bool,
+    udp_addrs: Vec<SocketAddrV4>,
+    udp_socket: Option<UdpSocket>,
 }
 
 impl DhtLogger {
@@ -112,10 +114,36 @@ impl DhtLogger {
             false
         };
 
+        let default = Value::Array(Vec::new());
+        let udp_addrs: Vec<SocketAddrV4> = logger_config
+            .get("udp")
+            .unwrap_or(&default)
+            .as_array()
+            .expect("logger.udp must be a list")
+            .iter()
+            .map(|addr| {
+                addr.as_str().expect(&format!(
+                    "UDP addresses must be strings, got value: {}",
+                    addr
+                ))
+            })
+            .map(|addr| {
+                addr.parse()
+                    .expect(&format!("Failed to parse IP:PORT, got value: {}", addr))
+            })
+            .collect();
+
+        let udp_socket = match udp_addrs.len() {
+            0 => None,
+            _ => Some(UdpSocket::bind("0.0.0.0:0").unwrap()),
+        };
+
         DhtLogger {
             port: RefCell::new(port),
             sensor_config,
             verbose,
+            udp_addrs,
+            udp_socket,
         }
     }
 
@@ -157,11 +185,9 @@ impl DhtLogger {
     /// serial interface or a timeout occurs.
     pub fn read_sensor(&self) -> Result<DhtSensors> {
         let mut buffer: [u8; BUFFER_SIZE] = [0; BUFFER_SIZE];
-        self.port.borrow_mut().read(&mut buffer)?;
-
-        let buffer = String::from_utf8(buffer.to_vec()).unwrap_or(String::new());
-        let buffer = buffer.trim_end_matches(|c: char| c == char::from(0));
-        let raw = match serde_json::from_str::<Value>(&buffer)? {
+        let n_bytes = self.port.borrow_mut().read(&mut buffer)?;
+        let timestamp = Utc::now();
+        let raw = match serde_json::from_slice::<Value>(&buffer[..n_bytes])? {
             Value::Object(map) => map,
             _ => {
                 return Err(Error::new(
@@ -171,7 +197,7 @@ impl DhtLogger {
             }
         };
 
-        let mut sensors = DhtSensors::new();
+        let mut sensors = HashMap::new();
         for (key, value) in raw.iter() {
             let value = if let Value::Object(map) = value {
                 map
@@ -204,7 +230,10 @@ impl DhtLogger {
             sensors.insert(String::from(key), data);
         }
 
-        Ok(sensors)
+        Ok(DhtSensors {
+            timestamp,
+            data: sensors,
+        })
     }
 
     /// Wait for the sensor to return data for a specified amount of retries. If the number of
@@ -239,10 +268,15 @@ impl DhtLogger {
     /// configured in the logger config for the DHT Logger.
     pub fn log_measurement(&self, measurement: DhtSensors) -> Result<()> {
         // convert raw sensor keys into aliases.
-        let measurement: DhtSensors = measurement
-            .iter()
-            .map(|(k, v)| (self.get_sensor_alias(k), *v))
-            .collect();
+        //let timestamp = measurement.timestamp;
+        let measurement = DhtSensors {
+            timestamp: measurement.timestamp,
+            data: measurement
+                .data
+                .iter()
+                .map(|(k, v)| (self.get_sensor_alias(k), *v))
+                .collect(),
+        };
 
         // Verbose logging
         let data_pretty = serde_json::to_string_pretty(&measurement)?;
@@ -252,6 +286,17 @@ impl DhtLogger {
         } else {
             log::debug!("{}", data_pretty);
         }
+
+        // UDP logging
+        if let Some(udp_socket) = &self.udp_socket {
+            let data_json = serde_json::to_vec(&DhtSensorsSerde::from(measurement))?;
+            log::trace!("{}", std::str::from_utf8(data_json.as_slice()).unwrap());
+            for addr in self.udp_addrs.iter() {
+                let bytes_sent = udp_socket.send_to(data_json.as_slice(), addr)?;
+                log::trace!("Sent {} bytes to UDP addr: {:?}", bytes_sent, addr);
+            }
+        }
+
         Ok(())
     }
 
