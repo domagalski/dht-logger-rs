@@ -1,0 +1,9 @@
+port: /dev/ttyUSB0
+baud: 115200
+
+sensor_config:
+  2: sensor_a
+  4: sensor_b
+
+logger_config:
+  verbose: true
