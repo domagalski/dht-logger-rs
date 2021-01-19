@@ -4,7 +4,6 @@ use std::collections::{HashMap, HashSet};
 use std::io::{Error, ErrorKind};
 
 use chrono::{DateTime, Utc};
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use super::Result;
@@ -37,6 +36,8 @@ impl From<DhtDataRaw> for SensorData {
 }
 
 /// Container of measurements from all DHT sensors in one reading.
+///
+/// The JSON serialization is not compact. For smaller JSON messages, use `DhtSensorsSerde`.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct DhtSensors {
     pub timestamp: DateTime<Utc>,
@@ -48,90 +49,68 @@ impl DhtSensors {
     ///
     /// If not all hashmaps in DhtSensorsPacked have
     pub fn from_serde(data: DhtSensorsSerde) -> Result<DhtSensors> {
-        let timestamp = data.timestamp;
-        let mut key_sets: HashSet<Vec<String>> = HashSet::new();
-        key_sets.insert(
-            data.t
-                .keys()
-                .cloned()
-                .collect::<Vec<String>>()
-                .iter()
-                .sorted()
-                .cloned()
-                .collect(),
-        );
-        key_sets.insert(
-            data.h
-                .keys()
-                .cloned()
-                .collect::<Vec<String>>()
-                .iter()
-                .sorted()
-                .cloned()
-                .collect(),
-        );
-        key_sets.insert(
-            data.hi
-                .keys()
-                .cloned()
-                .collect::<Vec<String>>()
-                .iter()
-                .sorted()
-                .cloned()
-                .collect(),
-        );
+        let mut lengths = HashSet::new();
+        lengths.insert(data.o.len());
+        lengths.insert(data.t.len());
+        lengths.insert(data.h.len());
+        lengths.insert(data.hi.len());
 
-        if key_sets.len() != 1 {
+        if lengths.len() != 1 {
             return Err(Error::new(
                 ErrorKind::InvalidData,
-                "key mismatched in packed data",
+                "length mismatch in serde data",
             ));
         }
 
-        let keys = key_sets.iter().next().unwrap();
         let mut sensor_data = HashMap::new();
-        for key in keys.iter() {
+        for (i, key) in data.o.iter().enumerate() {
             sensor_data.insert(
                 key.clone(),
                 SensorData {
-                    temperature: *data.t.get(key).unwrap(),
-                    humidity: *data.h.get(key).unwrap(),
-                    heat_index: *data.hi.get(key).unwrap(),
+                    temperature: data.t[i],
+                    humidity: data.h[i],
+                    heat_index: data.hi[i],
                 },
             );
         }
 
         Ok(DhtSensors {
-            timestamp,
+            timestamp: data.ts,
             data: sensor_data,
         })
     }
 }
 
 /// A more compactly serialized verson of DhtSensors for serializing via JSON
+///
+/// This is not intended on being human-readable. For human-readability, use `DhtSensors` instead.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct DhtSensorsSerde {
-    pub timestamp: DateTime<Utc>,
-    pub t: HashMap<String, f32>,
-    pub h: HashMap<String, f32>,
-    pub hi: HashMap<String, f32>,
+    pub ts: DateTime<Utc>,
+    pub o: Vec<String>,
+    pub t: Vec<f32>,
+    pub h: Vec<f32>,
+    pub hi: Vec<f32>,
 }
 
 impl From<DhtSensors> for DhtSensorsSerde {
     fn from(data: DhtSensors) -> DhtSensorsSerde {
         let timestamp = data.timestamp;
-        let mut temperature = HashMap::new();
-        let mut humidity = HashMap::new();
-        let mut heat_index = HashMap::new();
+        let mut order = Vec::new();
+        let mut temperature = Vec::new();
+        let mut humidity = Vec::new();
+        let mut heat_index = Vec::new();
 
         for (key, value) in data.data.iter() {
-            temperature.insert(key.clone(), value.temperature);
-            humidity.insert(key.clone(), value.humidity);
-            heat_index.insert(key.clone(), value.heat_index);
+            order.push(key.clone());
+            temperature.push(value.temperature);
+            humidity.push(value.humidity);
+            heat_index.push(value.heat_index);
         }
 
         DhtSensorsSerde {
-            timestamp,
+            ts: timestamp,
+            o: order,
             t: temperature,
             h: humidity,
             hi: heat_index,
