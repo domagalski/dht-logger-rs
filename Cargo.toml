@@ -1,9 +1,9 @@
 [package]
 name = "dht-logger"
-version = "0.1.0"
-authors = ["Rachel Domagalski]
-edition = "2018"
 license = "MIT"
+version = "0.1.0"
+authors = ["Rachel Domagalski"]
+edition = "2018"
 
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
