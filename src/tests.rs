@@ -14,10 +14,9 @@ use super::*;
 #[test]
 fn test_read_sensor() {
     let port = Box::new(MockSerialPort::new(1));
-    let sensor_config = HashMap::new();
     let logger_config = HashMap::new();
 
-    let logger = DhtLogger::new(port, sensor_config, logger_config);
+    let logger = DhtLogger::new(port, logger_config);
     assert!(logger.read_sensor().is_ok());
     assert!(logger.wait_for_sensor(10).is_ok());
 }
@@ -26,10 +25,9 @@ fn test_read_sensor() {
 #[test]
 fn test_empty_sensor() {
     let port = Box::new(MockSerialPort::new(0));
-    let sensor_config = HashMap::new();
     let logger_config = HashMap::new();
 
-    let logger = DhtLogger::new(port, sensor_config, logger_config);
+    let logger = DhtLogger::new(port, logger_config);
     assert!(logger.read_sensor().is_err());
 }
 
@@ -55,10 +53,9 @@ fn test_udp_logger() {
     // Create mock serial port
     let data_size = 10;
     let port = Box::new(MockSerialPort::new(data_size));
-    let sensor_config = HashMap::new();
 
     // Send fake data over UDP
-    let logger = DhtLogger::new(port, sensor_config, logger_config);
+    let logger = DhtLogger::new(port, logger_config);
     logger.read_sensor_and_log_data(10);
 
     // Deserialize data over UDP

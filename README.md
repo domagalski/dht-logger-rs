@@ -2,7 +2,7 @@
 Read DHT temperature sensor data formatted in JSON over a serial
 interface and log it.
 
-This crate is still under development.
+This crate is still under development and is not stable.
 
 This crate is for logging measurement from a device reading DHT sensors and
 writing the measurements over a serial connection. The hardware producing the
@@ -16,7 +16,7 @@ example reading:
     "h": 50.0,
     "hi": 20.0
   },
-  "another sensor": {
+  "another_sensor": {
     "error": "some error message"
   }
 }

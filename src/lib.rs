@@ -11,7 +11,7 @@
 //!     "h": 50.0,
 //!     "hi": 20.0
 //!   },
-//!   "another sensor": {
+//!   "another_sensor": {
 //!     "error": "some error message"
 //!   }
 //! }
@@ -58,12 +58,6 @@ const TIMEOUT: Duration = Duration::from_secs(4);
 /// port: /dev/ttyUSB0
 /// baud: 115200
 ///
-/// # Sensor alias mappings. Useful to log
-/// # a sensor name rather than a pin number
-/// sensor_config:
-///   2: sensor_a
-///   4: sensor_b
-///
 /// # Configure how the sensor data is logged.
 /// logger_config:
 ///   # verbose: true tells the logger to
@@ -74,7 +68,6 @@ const TIMEOUT: Duration = Duration::from_secs(4);
 pub struct DhtLoggerConfig {
     port: String,
     baud: u32,
-    sensor_config: HashMap<String, String>,
     logger_config: HashMap<String, Value>,
 }
 
@@ -86,7 +79,6 @@ pub struct DhtLoggerConfig {
 /// * `verbose`: Log incoming data using `log::info!`
 pub struct DhtLogger {
     port: RefCell<Box<dyn SerialPort>>,
-    sensor_config: HashMap<String, String>,
     verbose: bool,
     udp_addrs: Vec<SocketAddrV4>,
     udp_socket: Option<UdpSocket>,
@@ -97,13 +89,8 @@ impl DhtLogger {
     ///
     /// Args:
     /// * `port`: An interface to use as a serial port.
-    /// * `sensor_config`: Mapping of sensor names in the serial messages to more useful aliases.
     /// * `logger_config`: Configure how data is logged. See the `DhtLoggerConfig` documentation.
-    pub fn new(
-        port: Box<dyn SerialPort>,
-        sensor_config: HashMap<String, String>,
-        logger_config: HashMap<String, Value>,
-    ) -> DhtLogger {
+    pub fn new(port: Box<dyn SerialPort>, logger_config: HashMap<String, Value>) -> DhtLogger {
         let verbose = if let Some(verbose) = logger_config.get("verbose") {
             if let Value::Bool(verbose) = verbose {
                 *verbose
@@ -140,7 +127,6 @@ impl DhtLogger {
 
         DhtLogger {
             port: RefCell::new(port),
-            sensor_config,
             verbose,
             udp_addrs,
             udp_socket,
@@ -154,7 +140,6 @@ impl DhtLogger {
         let DhtLoggerConfig {
             port,
             baud,
-            sensor_config,
             logger_config,
         } = match serde_yaml::from_reader(config_file) {
             Ok(dht_logger) => dht_logger,
@@ -173,7 +158,7 @@ impl DhtLogger {
         log::trace!("Stop bits: {:?}", port.stop_bits());
         log::trace!("Timeout: {:?}", port.timeout());
 
-        DhtLogger::new(port, sensor_config, logger_config)
+        DhtLogger::new(port, logger_config)
     }
 
     /// Get the name of the serial port.
@@ -218,11 +203,7 @@ impl DhtLogger {
             };
 
             if let Some(error) = measurement.get_error() {
-                log::warn!(
-                    "Error reading '{}' sensor: {}",
-                    self.get_sensor_alias(key),
-                    error
-                );
+                log::warn!("Error reading '{}' sensor: {}", key, error);
                 continue;
             }
 
@@ -259,25 +240,9 @@ impl DhtLogger {
         }
     }
 
-    /// Convert a sensor name according to raw data into an alias
-    fn get_sensor_alias(&self, sensor: &String) -> String {
-        self.sensor_config.get(sensor).unwrap_or(sensor).clone()
-    }
-
     /// Log a measurement to the all of the logging channels
     /// configured in the logger config for the DHT Logger.
     pub fn log_measurement(&self, measurement: DhtSensors) -> Result<()> {
-        // convert raw sensor keys into aliases.
-        //let timestamp = measurement.timestamp;
-        let measurement = DhtSensors {
-            timestamp: measurement.timestamp,
-            data: measurement
-                .data
-                .iter()
-                .map(|(k, v)| (self.get_sensor_alias(k), *v))
-                .collect(),
-        };
-
         // Verbose logging
         let data_pretty = serde_json::to_string_pretty(&measurement)?;
         let data_pretty = format!("Received measurement:\n{}", data_pretty);
