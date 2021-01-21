@@ -1,7 +1,9 @@
 [package]
 name = "dht-logger"
 description = "Read DHT sensor data formatted in JSON over a serial interface and log it."
+documentation = "https://docs.rs/dht-logger"
 repository = "https://github.com/domagalski/dht-logger-rs"
+homepage = "https://github.com/domagalski/dht-logger-rs"
 keywords = ["dht", "dht22", "dht11", "sensors",  "serial"]
 categories = ["command-line-utilities", "encoding", "parsing"]
 readme = "README.md"
