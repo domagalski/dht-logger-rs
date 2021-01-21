@@ -1,6 +1,5 @@
 # dht-logger
-Read DHT temperature sensor data formatted in JSON over a serial
-interface and log it.
+Read DHT sensor data formatted in JSON over a serial interface and log it.
 
 This crate is still under development and is not stable.
 
