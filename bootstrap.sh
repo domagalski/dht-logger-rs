@@ -3,6 +3,7 @@
 set -o errexit
 set -o pipefail
 
+cargo install cross
 git submodule init
 git submodule update
 

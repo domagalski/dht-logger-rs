@@ -39,3 +39,17 @@ let config_path = Path::new("example_config.yaml");
 let logger = DhtLogger::from_config(config_path);
 logger.read_sensor_and_log_data(10);
 ```
+
+## Cross compiling for the Raspberry Pi
+
+The cross-compilation procedure for Raspberry Pi is modified from
+[rust-embedded/cross](https://github.com/rust-embedded/cross) to build against
+Debian buster instead of Ubuntu. Currently the Raspberry Pi Zero and 4B models
+are supported. To set up the cross-compilation for both the 4B and zero, run
+the bootstrap script:
+```
+./bootstrap.sh
+```
+
+After `./bootstrap.sh` is finished, the `build.sh` script can be run with
+either `4b` or `zero` as the arguments to determine the target.
