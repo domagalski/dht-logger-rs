@@ -171,8 +171,12 @@ impl DhtLogger {
     pub fn read_sensor(&self) -> Result<DhtSensors> {
         let mut buffer: [u8; BUFFER_SIZE] = [0; BUFFER_SIZE];
         let n_bytes = self.port.borrow_mut().read(&mut buffer)?;
+        let buffer = &buffer[..n_bytes];
+        if let Ok(buffer) = std::str::from_utf8(&buffer) {
+            log::trace!("got bytes: {}", buffer);
+        }
         let timestamp = Utc::now();
-        let raw = match serde_json::from_slice::<Value>(&buffer[..n_bytes])? {
+        let raw = match serde_json::from_slice::<Value>(&buffer)? {
             Value::Object(map) => map,
             _ => {
                 return Err(Error::new(
