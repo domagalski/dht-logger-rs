@@ -44,7 +44,7 @@ logger.read_sensor_and_log_data(10);
 
 The cross-compilation procedure for Raspberry Pi is modified from
 [rust-embedded/cross](https://github.com/rust-embedded/cross) to build against
-Debian buster instead of Ubuntu. Currently the Raspberry Pi Zero and 4B models
+Debian Buster instead of Ubuntu. Currently the Raspberry Pi Zero and 4B models
 are supported. To set up the cross-compilation for both the 4B and zero, run
 the bootstrap script:
 ```
