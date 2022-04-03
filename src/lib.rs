@@ -26,7 +26,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Error, ErrorKind};
 use std::net::{SocketAddrV4, UdpSocket};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
 
@@ -162,8 +162,11 @@ impl DhtLogger {
     }
 
     /// Get the name of the serial port.
-    pub fn port(&self) -> Option<String> {
-        self.port.borrow().name()
+    pub fn port(&self) -> Option<PathBuf> {
+        match self.port.borrow().name() {
+            Some(name) => Some(Path::new(&name).to_path_buf()),
+            None => None,
+        }
     }
 
     /// Read sensor data over serial and return it. This blocks until data is readable over the

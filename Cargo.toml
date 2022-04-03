@@ -8,13 +8,13 @@ keywords = ["dht", "dht22", "dht11", "sensors",  "serial"]
 categories = ["command-line-utilities", "encoding", "parsing"]
 readme = "README.md"
 license = "MIT"
-version = "0.1.5"
+version = "0.1.6"
 authors = ["Rachel Domagalski"]
 edition = "2018"
 
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
-clap = "2.33"
+clap = { version = "3.0", features = ["derive"] }
 lazy_static = "1.4"
 log = "0.4"
 pretty_env_logger = "0.4.0"
