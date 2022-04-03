@@ -36,7 +36,8 @@ use std::path::Path;
 use dht_logger::DhtLogger;
 
 let config_path = Path::new("example_config.yaml");
-let logger = DhtLogger::from_config(config_path);
+let config = DhtLoggerConfig::load_yaml(config_path);
+let logger = DhtLogger::from_config(&config);
 logger.read_sensor_and_log_data(10);
 ```
 

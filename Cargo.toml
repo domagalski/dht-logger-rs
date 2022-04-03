@@ -8,7 +8,7 @@ keywords = ["dht", "dht22", "dht11", "sensors",  "serial"]
 categories = ["command-line-utilities", "encoding", "parsing"]
 readme = "README.md"
 license = "MIT"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Rachel Domagalski"]
 edition = "2018"
 
