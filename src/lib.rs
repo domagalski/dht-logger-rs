@@ -66,9 +66,20 @@ const TIMEOUT: Duration = Duration::from_secs(4);
 /// ```
 #[derive(Debug, Deserialize, Serialize)]
 pub struct DhtLoggerConfig {
-    port: String,
-    baud: u32,
-    logger_config: HashMap<String, Value>,
+    pub port: PathBuf,
+    pub baud: u32,
+    pub logger_config: HashMap<String, Value>,
+}
+
+impl DhtLoggerConfig {
+    /// Load a YAML config file into a config struct
+    pub fn load_yaml(config_file: &Path) -> DhtLoggerConfig {
+        let config_file = File::open(config_file).unwrap();
+        match serde_yaml::from_reader(config_file) {
+            Ok(dht_logger) => dht_logger,
+            Err(_) => panic!("YAML parse error in DHT logger config."),
+        }
+    }
 }
 
 /// DHT Logger client.
@@ -133,23 +144,15 @@ impl DhtLogger {
         }
     }
 
-    /// Create a DHT logger from loading a YAML configuration file.
-    pub fn from_config(config_file: &Path) -> DhtLogger {
-        // Panic if the config file doesn't exist or can't be parsed.
-        let config_file = File::open(config_file).unwrap();
-        let DhtLoggerConfig {
-            port,
-            baud,
-            logger_config,
-        } = match serde_yaml::from_reader(config_file) {
-            Ok(dht_logger) => dht_logger,
-            Err(_) => panic!("YAML parse error in DHT logger config."),
-        };
-
-        let port = serialport::new(port.clone(), baud)
+    /// Create a DHT logger from a DhtLoggerConfig.
+    pub fn from_config(config: &DhtLoggerConfig) -> DhtLogger {
+        let port = serialport::new(config.port.to_str().unwrap(), config.baud)
             .timeout(TIMEOUT)
             .open()
-            .expect(&format!("Failed to open port: {}", port));
+            .expect(&format!(
+                "Failed to open port: {}",
+                config.port.to_str().unwrap()
+            ));
 
         // trace log serial port parameters
         log::trace!("Data bits: {:?}", port.data_bits());
@@ -158,7 +161,7 @@ impl DhtLogger {
         log::trace!("Stop bits: {:?}", port.stop_bits());
         log::trace!("Timeout: {:?}", port.timeout());
 
-        DhtLogger::new(port, logger_config)
+        DhtLogger::new(port, config.logger_config.to_owned())
     }
 
     /// Get the name of the serial port.

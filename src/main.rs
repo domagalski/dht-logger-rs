@@ -6,7 +6,7 @@ use std::time::Duration;
 use clap::Parser;
 use pretty_env_logger;
 
-use dht_logger::DhtLogger;
+use dht_logger::{DhtLogger, DhtLoggerConfig};
 
 const LOOP_RETRIES: u32 = 10;
 
@@ -23,15 +23,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     pretty_env_logger::init();
 
     let args = Args::parse();
-    let logger = DhtLogger::from_config(&args.config);
+    let config = DhtLoggerConfig::load_yaml(&args.config);
 
-    if let Some(port) = logger.port() {
-        log::info!("Waiting for serial port: {}", port.to_str().unwrap());
-        while !port.exists() {
-            thread::sleep(Duration::from_secs(1));
-        }
+    log::info!("Waiting for serial port: {}", config.port.to_str().unwrap());
+    while !config.port.exists() {
+        thread::sleep(Duration::from_secs(1));
     }
 
+    let logger = DhtLogger::from_config(&config);
     match logger.port() {
         Some(port) => log::info!("Listening for data on port: {}", port.to_str().unwrap()),
         None => log::info!("Listening for data..."),
