@@ -1,5 +1,5 @@
 [target.armv7-unknown-linux-gnueabihf]
-image = "cross/rpi/4b:latest"
+image = "cross/dht-logger/4b:latest"
 
 [target.arm-unknown-linux-gnueabi]
-image = "cross/rpi/zero:latest"
+image = "cross/dht-logger/zero:latest"

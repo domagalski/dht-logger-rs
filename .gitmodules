@@ -1,3 +1,0 @@
-[submodule "cross"]
-	path = cross
-	url = git@github.com:rust-embedded/cross.git
