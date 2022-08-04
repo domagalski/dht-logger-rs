@@ -8,9 +8,9 @@ keywords = ["dht", "dht22", "dht11", "sensors",  "serial"]
 categories = ["command-line-utilities", "encoding", "parsing"]
 readme = "README.md"
 license = "MIT"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Rachel Domagalski"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
