@@ -3,8 +3,8 @@
 set -o errexit
 set -o pipefail
 
-if [ "$1" == "4b" ]; then
-  RUSTC_TARGET=armv7-unknown-linux-gnueabihf
+if [ "$1" == "pi5" ]; then
+  RUSTC_TARGET=aarch64-unknown-linux-gnu
 elif [ "$1" == "zero" ]; then
   RUSTC_TARGET=arm-unknown-linux-gnueabi
 else
